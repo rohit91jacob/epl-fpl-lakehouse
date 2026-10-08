@@ -1,0 +1,32 @@
+# Lake data and local runtime state
+data/
+spark-warehouse/
+metastore_db/
+derby.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets / local config
+.env
+*.pem
+*.key
+
+# Editors
+.idea/
+.vscode/
+.DS_Store

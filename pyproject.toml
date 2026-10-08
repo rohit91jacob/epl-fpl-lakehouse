@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "epl-fpl-lakehouse"
+version = "0.1.0"
+description = "Spark + Delta Lake medallion pipeline for English Premier League data from the Fantasy Premier League API, orchestrated with Airflow."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "rohit91jacob" }]
+keywords = ["premier-league", "fantasy-premier-league", "spark", "delta-lake", "airflow", "data-engineering", "lakehouse"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Database",
+]
+dependencies = [
+  # Spark and Delta are pinned as a verified pair: Delta jars are built per Spark version.
+  "pyspark==4.1.1",
+  "delta-spark==4.3.1",
+  "requests>=2.32,<3",
+  "urllib3>=2.2,<3",
+]
+
+[project.scripts]
+epl = "epl_lakehouse.cli:main"
+
+[project.urls]
+Repository = "https://github.com/rohit91jacob/epl-fpl-lakehouse"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "responses>=0.25",
+  "ruff>=0.15",
+  "mypy>=1.15",
+  "types-requests>=2.32",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/epl_lakehouse"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "dags"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "C4", "PT", "PL"]
+ignore = [
+  "N812",     # `from pyspark.sql import functions as F` is the PySpark convention
+  "PLC0415",  # the CLI imports Spark lazily so `epl ingest` starts without a JVM
+  "PLR0913",  # pipeline functions legitimately take several collaborators
+  "PLR2004",  # magic values are clearer inline for football rules (3 points per win, ...)
+  "PLR0915",
+  "PLR0912",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR0913", "PLR2004"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+  "spark: needs a local Spark session (Java 17+)",
+  "airflow: needs apache-airflow installed",
+]
+filterwarnings = ["ignore::DeprecationWarning:pyspark.*"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["delta.*", "pyspark.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["epl_lakehouse"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
