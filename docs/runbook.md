@@ -58,6 +58,26 @@ deadline changes. No action is needed, because every table is keyed by season an
 incremental state is per season. Before gameweek 1, gold builds only the dimensions,
 league table and ticker, and the player facts appear once live stats exist.
 
+## Scheduled refresh (GitHub Actions)
+
+`refresh.yml` runs daily at 06:30 UTC and publishes https://rohit91jacob.github.io/epl-fpl-lakehouse/.
+
+- **It failed:** a `Scheduled refresh is failing` issue is opened, or commented on if one is
+  already open, with the run link. Open the run, find the failing step, apply the table above,
+  then re-run with **Run workflow** in the Actions tab. Close the issue once a run is green.
+- **The site is stale but the runs are green:** check that the `deploy` job ran, and that
+  Settings → Pages → Source is "GitHub Actions".
+- **"restored from: nothing (fresh lake)" in the log:** the Actions cache was evicted. The run
+  rebuilds everything from the API, so standings and facts are exact again, but `dim_player`
+  history restarts that day.
+- **Rebuild on purpose:** Run workflow with `full_refresh` ticked.
+- **Schedules stopped running:** GitHub disables schedules after 60 days without repository
+  activity. `keepalive.yml` re-enables them monthly. If they're disabled anyway, re-enable them
+  in the Actions tab (select the workflow, then **Enable workflow**), or run `keepalive.yml`
+  manually.
+- **Credentials:** none. If GitHub ever reports a permissions error, check the
+  workflow-level `permissions:` blocks; they use only the built-in `GITHUB_TOKEN`.
+
 ## Maintenance
 
 `epl_fpl_maintenance` runs weekly: `OPTIMIZE` (compaction) and then `VACUUM` with

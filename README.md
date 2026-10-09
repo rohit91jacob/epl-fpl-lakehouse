@@ -1,6 +1,8 @@
 # EPL FPL Lakehouse
 
 [![CI](https://github.com/rohit91jacob/epl-fpl-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/rohit91jacob/epl-fpl-lakehouse/actions/workflows/ci.yml)
+[![Refresh](https://github.com/rohit91jacob/epl-fpl-lakehouse/actions/workflows/refresh.yml/badge.svg)](https://github.com/rohit91jacob/epl-fpl-lakehouse/actions/workflows/refresh.yml)
+[![Live results](https://img.shields.io/badge/live%20results-GitHub%20Pages-2a78d6.svg)](https://rohit91jacob.github.io/epl-fpl-lakehouse/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg)
 ![Spark](https://img.shields.io/badge/spark-4.1-orange.svg)
@@ -15,6 +17,8 @@ An end-to-end data pipeline for **English Premier League** data from the
 - Data-quality gates sit between the layers, and every stage is idempotent and
   incremental.
 - **Apache Airflow** orchestrates the stages. CI runs the full stack in Docker.
+
+**Live results, rebuilt every morning:** https://rohit91jacob.github.io/epl-fpl-lakehouse/
 
 It produces a dimensional model and analytics marts: league standings after every
 gameweek, player form and value, team xG, a fixture-difficulty ticker, and a type-2
@@ -62,6 +66,7 @@ flowchart LR
 | Data quality | Declarative checks; results persisted; `error` checks fail the run | `quality/` |
 | Orchestration | Airflow DAGs that call the `epl` CLI | `dags/` |
 | Maintenance | `OPTIMIZE` + `VACUUM` | `maintenance.py` |
+| Results site | Static, script-free HTML + `data.json` from gold, published to GitHub Pages | `report.py` |
 
 ## Tech stack
 
@@ -165,6 +170,7 @@ uv run epl show gold.mart_player_form --where "gameweek_id = 5" --order-by "poin
   --columns web_name,price_m,points_last5,xgi_last5,points_per_million_last5 --limit 5
 uv run epl show gold.mart_fixture_ticker --order-by avg_difficulty --columns team_id,avg_difficulty,ticker
 uv run epl show ops.dq_results --where "NOT passed"      # empty when all checks pass
+uv run epl report --out site                             # the results site: site/index.html
 ```
 
 Each stage can also run on its own: `epl ingest`, `epl bronze`, `epl silver`,
@@ -232,13 +238,27 @@ actually runs.
 | `docker` | builds the pipeline image and runs the full pipeline inside it on synthetic data |
 | `compose-e2e` | boots Airflow + Postgres with Docker Compose, runs `airflow dags test epl_fpl_daily`, then re-runs every data-quality check inside the stack |
 
+Two more workflows keep the data current:
+
+| Workflow | Schedule | What it does |
+|---|---|---|
+| `refresh.yml` | daily 06:30 UTC, or manual (with an optional full refresh) | Restores the lake from the Actions cache, runs `epl run` against the live API (incremental), runs maintenance on Mondays, saves the lake, builds the results site and deploys it to GitHub Pages. On a scheduled failure it opens a `Scheduled refresh is failing` issue, or comments on the open one. |
+| `keepalive.yml` | 1st of each month | GitHub disables scheduled workflows in public repos after 60 days without activity; this re-enables them through the API, with no dummy commits. |
+
 Dependabot updates uv, GitHub Actions and Docker base images weekly. Spark and Delta are
 pinned and bumped together by hand. Pre-commit runs ruff and basic hygiene hooks.
 
 ## Operations
 
-- **Schedule:** `epl_fpl_daily` runs at 06:00 UTC, after FPL confirms bonus points
-  overnight. `epl_fpl_maintenance` runs on Mondays at 03:00 UTC.
+- **Schedule:** the hosted refresh is the GitHub Actions `refresh.yml` workflow (daily 06:30 UTC),
+  which publishes the live results site. For self-hosted deployments the same stages run as the
+  Airflow DAG `epl_fpl_daily` (06:00 UTC) plus `epl_fpl_maintenance` (Mondays 03:00 UTC).
+- **Credentials: none to maintain.** The FPL API is public, and publishing uses GitHub's
+  built-in per-run `GITHUB_TOKEN`, so nothing expires or needs rotating.
+- **Where the lake lives on GitHub:** the Actions cache, restored at the start of each run and
+  saved at the end. If the cache is evicted (7 days unused, or the 10 GB repo limit), the next
+  run rebuilds the lake from the API. Standings and facts come back exactly; `dim_player`
+  price history restarts from that day.
 - **Incremental:** final gameweeks are never refetched, unchanged responses are not
   stored again, silver processes only bronze rows newer than its watermark, and gold
   rebuilds only the seasons present.
@@ -262,6 +282,7 @@ pinned and bumped together by hand. Pre-commit runs ruff and basic hygiene hooks
 │   ├── bronze.py · silver.py · gold.py · schemas.py · delta_io.py · ops.py
 │   ├── quality/               # framework.py · suites.py · results.py
 │   ├── maintenance.py         # OPTIMIZE + VACUUM
+│   ├── report.py              # static results site (GitHub Pages)
 │   ├── spark_session.py
 │   └── sample.py              # deterministic synthetic FPL API
 ├── dags/                      # epl_fpl_daily.py · epl_fpl_maintenance.py
@@ -270,7 +291,7 @@ pinned and bumped together by hand. Pre-commit runs ruff and basic hygiene hooks
 ├── Dockerfile                 # standalone pipeline image (Delta jars baked in)
 ├── docker/airflow/Dockerfile  # Airflow + Java + epl
 ├── docker-compose.yml         # Airflow 3 + Postgres (+ standalone profile)
-├── .github/                   # CI workflow, Dependabot
+├── .github/                   # CI, daily refresh + Pages, keep-alive, Dependabot
 └── pyproject.toml · uv.lock · Makefile · .env.example
 ```
 
@@ -295,12 +316,14 @@ pinned and bumped together by hand. Pre-commit runs ruff and basic hygiene hooks
   League's head-to-head tie-breakers are not implemented.
 - `mart_team_gameweek.xg_against` is an approximation: it takes the largest
   `expected_goals_conceded` among the club's players.
+- On GitHub, the lake persists in the Actions cache, which is best-effort storage. An evicted
+  cache means a rebuild, and price history restarts.
 - The raw zone is a local filesystem. Delta paths could be `s3a://`, but raw landing
   would need an object-store writer first.
 
-**Roadmap:** object-store raw zone (S3/GCS), a BI-friendly SQL endpoint (Spark Thrift or
-DuckDB over Delta), multi-season backfill from the `history_past` codes, and alerting
-hooks on DAG failure.
+**Roadmap:** an object-store lake (S3/GCS) so history survives cache eviction, a BI-friendly
+SQL endpoint (Spark Thrift or DuckDB over Delta), and multi-season backfill from the
+`history_past` codes.
 
 ## License
 
