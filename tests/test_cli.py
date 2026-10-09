@@ -14,7 +14,17 @@ def test_help_lists_every_stage(capsys: pytest.CaptureFixture[str]) -> None:
         cli.main(["--help"])
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    for command in ("ingest", "bronze", "silver", "gold", "quality", "run", "maintenance", "show"):
+    for command in (
+        "ingest",
+        "bronze",
+        "silver",
+        "gold",
+        "quality",
+        "run",
+        "maintenance",
+        "show",
+        "report",
+    ):
         assert command in out
 
 

@@ -253,3 +253,21 @@ def test_scd2_tracks_price_changes(lake: Lake, sample_api: Path, sample_api_gw6:
         assert old["is_current"] is False
         assert new["valid_to"] is None
         assert new["is_current"] is True
+
+
+def test_results_site_renders_from_gold(lake: Lake, spark: Any, tmp_path: Path) -> None:
+    import json
+
+    from epl_lakehouse.report import build_report
+
+    page = build_report(spark, lake.settings, tmp_path / "site")
+    html = page.read_text()
+    data = json.loads((tmp_path / "site" / "data.json").read_text())
+    assert data["as_of_gameweek"] == 6
+    assert len(data["league_table"]) == 20
+    leader = data["league_table"][0]
+    assert leader["team_name"] in html
+    assert html.count("<tr>") >= 20 + 10 + 20 + 20  # league, form, ticker, xG rows
+    assert "<script" not in html and "http://" not in html  # self-contained page
+    assert len(data["in_form"]) == 10
+    assert {r["position_id"] for r in data["value_picks"]} <= {1, 2, 3, 4}

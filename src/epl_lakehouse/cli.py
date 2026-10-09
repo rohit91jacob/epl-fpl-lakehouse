@@ -118,6 +118,14 @@ def _sort_column(spec: str):  # type: ignore[no-untyped-def]
     return column.desc() if direction.strip().lower() == "desc" else column.asc()
 
 
+def cmd_report(settings: Settings, args: argparse.Namespace) -> int:
+    from epl_lakehouse.report import build_report
+
+    page = build_report(_spark(settings), settings, Path(args.out))
+    print(page.resolve().as_uri())
+    return EXIT_OK
+
+
 def cmd_sample_data(settings: Settings, args: argparse.Namespace) -> int:
     from epl_lakehouse.sample import SampleConfig, write_sample_api
 
@@ -184,6 +192,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--order-by", help='comma-separated, e.g. "points DESC,team_name"')
     p.add_argument("--columns", help="comma-separated columns to show")
     p.add_argument("--limit", type=int, default=20)
+
+    p = add("report", cmd_report, "Write the static results site (index.html + data.json).")
+    p.add_argument("--out", default="site", help="output directory")
 
     p = add("sample-data", cmd_sample_data, "Write a synthetic FPL API snapshot for offline runs.")
     p.add_argument("--out", required=True)
