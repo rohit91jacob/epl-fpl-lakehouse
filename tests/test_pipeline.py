@@ -268,6 +268,7 @@ def test_results_site_renders_from_gold(lake: Lake, spark: Any, tmp_path: Path) 
     leader = data["league_table"][0]
     assert leader["team_name"] in html
     assert html.count("<tr>") >= 20 + 10 + 20 + 20  # league, form, ticker, xG rows
-    assert "<script" not in html and "http://" not in html  # self-contained page
+    assert "<script" not in html  # self-contained page
+    assert "http://" not in html
     assert len(data["in_form"]) == 10
     assert {r["position_id"] for r in data["value_picks"]} <= {1, 2, 3, 4}

@@ -64,6 +64,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR0913", "PLR2004"]
+# HTML template module: long markup lines and typographic dashes/minus signs are intentional.
+"src/epl_lakehouse/report.py" = ["E501", "RUF001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
