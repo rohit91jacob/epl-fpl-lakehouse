@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Standalone pipeline image: `docker run epl-fpl-lakehouse run` (or any `epl` subcommand).
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
